@@ -3,11 +3,14 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <onnxruntime_cxx_api.h>
-
+#include <tensorrt_provider_factory.h>
+#include <tensorrt_provider_options.h>
 #include "Helpers.cpp"
+
 
 using namespace cv;
 using namespace std;
+ 
 
 
 int main(int, char**) {
@@ -25,13 +28,25 @@ int main(int, char**) {
     const string imgFile = "/home/yp/workDir/cmake_demo/assets/dog.png";
     const string labelFile = "/home/yp/workDir/cmake_demo/assets/imagenet_classes.txt";
     auto modelPath = "/home/yp/workDir/cmake_demo/assets/resnet50v2.onnx";
-    const bool isGPU = true;
+    const bool isGPU = false;
+    const bool isTRT = true;
 
     sessionOptions = Ort::SessionOptions();
-
+    
+    // cuda
     std::vector<std::string> availableProviders = Ort::GetAvailableProviders();
     auto cudaAvailable = std::find(availableProviders.begin(), availableProviders.end(), "CUDAExecutionProvider");
     OrtCUDAProviderOptions cudaOption;
+
+    // tensorrt
+    auto TrtAvailable = std::find(availableProviders.begin(), availableProviders.end(), "TenosrrtExecutionProvider");
+    OrtTensorRTProviderOptions trtOptions;
+    trtOptions.device_id = 0;
+    trtOptions.trt_fp16_enable = 1;
+    trtOptions.trt_int8_enable = 0;
+    trtOptions.trt_engine_cache_enable = 1;
+    trtOptions.trt_engine_cache_path = "/home/yp/workDir/cmake_demo/cache";
+
 
     if (isGPU && (cudaAvailable == availableProviders.end()))
     {
@@ -42,6 +57,11 @@ int main(int, char**) {
     {
         std::cout << "Inference device: GPU" << std::endl;
         sessionOptions.AppendExecutionProvider_CUDA(cudaOption);
+    }
+    else if (isTRT)
+    {
+        std::cout << "Inference device: Trt" << std::endl;
+        sessionOptions.AppendExecutionProvider_TensorRT(trtOptions);
     }
     else
     {
@@ -131,3 +151,7 @@ int main(int, char**) {
         cout << i + 1 << ": " << labels[result.first] << " " << result.second << endl;
     }
 }
+
+
+
+// rm -r build && mkdir build && cd build && cmake .. && make && ./demo
